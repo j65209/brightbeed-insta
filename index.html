@@ -342,10 +342,22 @@ input[type="color"] {
   border-radius: 50%; animation: blink 1s infinite;
 }
 @keyframes blink { 50% { opacity: 0.3; } }
-@media (max-width: 768px) {
-  .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  .sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 50vh; }
-  .preview-area { padding: 16px; }
+@media (orientation: portrait) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 50vh 1fr;
+    grid-template-areas: "preview" "sidebar";
+  }
+  .preview-area {
+    grid-area: preview;
+    padding: 16px;
+  }
+  .sidebar {
+    grid-area: sidebar;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    max-height: none;
+  }
 }
 </style>
 </head>
