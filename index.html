@@ -1371,8 +1371,8 @@ async function exportAsImage() {
   ctx.fillRect(0, 0, OUT_W, OUT_H);
   if (state.media) await drawMediaToCanvas(ctx);
   drawTextsToCanvas(ctx);
-  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-  downloadBlob(blob, `brightbeed-${timestamp()}.png`);
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.95));
+  downloadBlob(blob, `brightbeed-${timestamp()}.jpg`);
 }
 
 async function drawMediaToCanvas(ctx) {
@@ -1572,7 +1572,7 @@ async function exportAsVideo() {
   const stream = canvas.captureStream(30);
   const recorder = new MediaRecorder(stream, {
     mimeType,
-    videoBitsPerSecond: 10_000_000,
+    videoBitsPerSecond: 6_000_000,
   });
   const chunks = [];
   recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
