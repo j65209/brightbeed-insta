@@ -116,16 +116,21 @@ input[type="color"] {
   background: var(--bg); border-radius: 10px;
   padding: 10px; margin-bottom: 10px;
 }
-.text-add-area textarea {
+.text-add-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.text-add-cell { display: flex; flex-direction: column; gap: 6px; }
+.text-add-label {
+  font-size: 11px; color: var(--muted);
+  font-weight: 600; letter-spacing: 0.3px;
+}
+.text-add-input {
   width: 100%; border: 1px solid var(--border); border-radius: 8px;
-  padding: 10px; font-size: 13px; font-family: inherit;
+  padding: 8px 10px; font-size: 12px; font-family: inherit;
   outline: none; resize: none; background: white;
-  min-height: 50px;
 }
-.text-add-area textarea:focus { border-color: var(--text); }
-.text-add-area .add-action {
-  display: flex; gap: 6px; margin-top: 8px;
-}
+.text-add-input:focus { border-color: var(--text); }
+.btn-mini { padding: 7px 10px; font-size: 12px; border-radius: 6px; }
 .btn-primary {
   flex: 1; padding: 9px 12px;
   background: var(--text); color: white;
@@ -309,9 +314,17 @@ input[type="color"] {
       <div id="textList"></div>
 
       <div class="text-add-area">
-        <textarea id="newTextInput" placeholder="직접 입력하거나 아래에서 선택" rows="2"></textarea>
-        <div class="add-action">
-          <button class="btn-primary" id="addTextBtn">+ 텍스트 추가</button>
+        <div class="text-add-grid">
+          <div class="text-add-cell">
+            <div class="text-add-label">1줄 직접 입력</div>
+            <textarea class="text-add-input" id="newTextInput1" placeholder="짧은 한 줄" rows="1"></textarea>
+            <button class="btn-primary btn-mini" data-target="newTextInput1">+ 추가</button>
+          </div>
+          <div class="text-add-cell">
+            <div class="text-add-label">2줄 직접 입력</div>
+            <textarea class="text-add-input" id="newTextInput2" placeholder="첫 줄&#10;두 번째 줄" rows="2"></textarea>
+            <button class="btn-primary btn-mini" data-target="newTextInput2">+ 추가</button>
+          </div>
         </div>
       </div>
 
@@ -592,8 +605,6 @@ const el = {
   mediaList: $('mediaList'),
   mediaScale: $('mediaScale'),
   mediaScaleVal: $('mediaScaleVal'),
-  newTextInput: $('newTextInput'),
-  addTextBtn: $('addTextBtn'),
   textList: $('textList'),
   textEditSection: $('textEditSection'),
   textContent: $('textContent'),
@@ -665,18 +676,29 @@ function addTextLayer(initialText) {
   renderAll();
 }
 
-el.addTextBtn.addEventListener('click', () => {
-  const text = el.newTextInput.value.trim() || '텍스트';
-  addTextLayer(text);
-  el.newTextInput.value = '';
-});
-
-el.newTextInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-    e.preventDefault();
-    el.addTextBtn.click();
+function setupAddTextInput(inputId, isSingleLine) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const btn = document.querySelector(`.text-add-cell .btn-primary[data-target="${inputId}"]`);
+  function submit() {
+    const text = input.value.trim() || '텍스트';
+    addTextLayer(text);
+    input.value = '';
   }
-});
+  if (btn) btn.addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    if (isSingleLine && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    } else if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      submit();
+    }
+  });
+}
+setupAddTextInput('newTextInput1', true);
+setupAddTextInput('newTextInput2', false);
 
 el.categoryTabs.addEventListener('click', (e) => {
   const btn = e.target.closest('.tab');
