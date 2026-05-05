@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reels Maker</title>
+<style>
+:root {
+  --bg: #f7f7f8;
+  --card: #ffffff;
+  --border: #ececec;
+  --text: #0a0a0a;
+  --muted: #777;
+  --hover: #f4f4f5;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Pretendard", "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+.app {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  height: 100vh;
+}
+.sidebar {
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  padding: 28px 24px;
+  overflow-y: auto;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.brand h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.brand .badge {
+  font-size: 10px;
+  background: var(--text);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.subtitle {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 24px;
+}
+.add-btn {
+  width: 100%;
+  padding: 28px 16px;
+  background: var(--text);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.add-btn:hover { transform: translateY(-1px); background: #1f1f1f; }
+.add-btn:active { transform: translateY(0); }
+.add-btn .plus {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 300;
+}
+.section { margin-top: 24px; }
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #999;
+  letter-spacing: 0.6px;
+  margin-bottom: 10px;
+}
+.layer-item {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  border: 1.5px solid transparent;
+  font-size: 13px;
+}
+.layer-item.selected { background: var(--card); border-color: var(--text); }
+.layer-item:hover { background: var(--hover); }
+.layer-item.selected:hover { background: var(--card); }
+.layer-item .icon { font-size: 14px; }
+.layer-item .label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.layer-item .delete {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+.layer-item .delete:hover { background: #fee; color: #e53e3e; }
+.control { margin-bottom: 14px; }
+.control:last-child { margin-bottom: 0; }
+.control-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.input, .textarea, .select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: white;
+  color: var(--text);
+  transition: border-color 0.15s;
+}
+.input:focus, .textarea:focus, .select:focus { border-color: var(--text); }
+.textarea { resize: vertical; min-height: 60px; }
+input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: #e5e5e5;
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--text);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+input[type="color"] {
+  width: 36px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 2px;
+  background: white;
+}
+.row { display: flex; align-items: center; gap: 8px; }
+.range-value {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.add-text-btn {
+  width: 100%;
+  padding: 12px;
+  background: white;
+  border: 1px dashed #d0d0d0;
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.add-text-btn:hover {
+  border-color: var(--text);
+  color: var(--text);
+  background: var(--bg);
+}
+.preview-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  position: relative;
+}
+.preview-frame {
+  aspect-ratio: 9 / 16;
+  height: 100%;
+  max-height: calc(100vh - 64px);
+  max-width: 100%;
+  background: #000;
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.04);
+}
+.preview-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+  gap: 12px;
+  pointer-events: none;
+}
+.preview-empty .big {
+  font-size: 40px;
+  opacity: 0.3;
+  font-weight: 200;
+}
+.media-layer {
+  position: absolute;
+  cursor: move;
+  user-select: none;
+}
+.media-layer img, .media-layer video {
+  display: block;
+  pointer-events: none;
+  max-width: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.text-layer {
+  position: absolute;
+  cursor: move;
+  user-select: none;
+  white-space: pre-wrap;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  padding: 4px;
+  line-height: 1.2;
+  word-break: keep-all;
+  max-width: 90%;
+}
+.text-layer.selected {
+  outline: 2px dashed rgba(255,255,255,0.8);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.size-info {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0,0,0,0.5);
+  color: white;
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  pointer-events: none;
+  letter-spacing: 0.5px;
+}
+.hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.5);
+  color: white;
+  font-size: 11px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.preview-frame:hover .hint { opacity: 1; }
+@media (max-width: 768px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 50vh; }
+  .preview-area { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>Reels Maker</h1>
+      <span class="badge">9:16</span>
+    </div>
+    <p class="subtitle">인스타 릴스용 빠른 편집</p>
+
+    <button class="add-btn" id="addMediaBtn">
+      <span class="plus">+</span>
+      <span>이미지 / 영상 추가</span>
+    </button>
+    <input type="file" id="mediaInput" accept="image/*,video/*" hidden>
+
+    <div class="section" id="mediaSection" style="display:none">
+      <div class="section-title">미디어</div>
+      <div id="mediaList"></div>
+      <div class="control" style="margin-top:12px">
+        <label class="control-label">크기</label>
+        <div class="row">
+          <input type="range" id="mediaScale" min="20" max="300" value="100">
+          <span class="range-value" id="mediaScaleVal">100%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">텍스트</div>
+      <div id="textList"></div>
+      <button class="add-text-btn" id="addTextBtn">+ 텍스트 추가</button>
+    </div>
+
+    <div class="section" id="textEditSection" style="display:none">
+      <div class="section-title">텍스트 편집</div>
+      <div class="control">
+        <label class="control-label">내용</label>
+        <textarea class="textarea" id="textContent" rows="2"></textarea>
+      </div>
+      <div class="control">
+        <label class="control-label">크기</label>
+        <div class="row">
+          <input type="range" id="textSize" min="12" max="120" value="42">
+          <span class="range-value" id="textSizeVal">42px</span>
+        </div>
+      </div>
+      <div class="control">
+        <label class="control-label">색상</label>
+        <div class="row">
+          <input type="color" id="textColor" value="#ffffff">
+          <input type="text" class="input" id="textColorHex" value="#ffffff" style="flex:1">
+        </div>
+      </div>
+      <div class="control">
+        <label class="control-label">굵기</label>
+        <select class="select" id="textWeight">
+          <option value="400">기본</option>
+          <option value="600">진하게</option>
+          <option value="800" selected>매우 진하게</option>
+        </select>
+      </div>
+    </div>
+  </aside>
+
+  <main class="preview-area">
+    <div class="preview-frame" id="previewFrame">
+      <div class="preview-empty" id="previewEmpty">
+        <span class="big">+</span>
+        <span>왼쪽에서 이미지 / 영상을 추가하세요</span>
+      </div>
+      <div class="size-info">9:16</div>
+      <div class="hint">드래그로 이동 · Delete로 삭제</div>
+    </div>
+  </main>
+</div>
+
+<script>
+const state = {
+  media: null,
+  texts: [],
+  selectedTextId: null,
+};
+let lastMediaSrc = null;
+
+const $ = (id) => document.getElementById(id);
+const el = {
+  addMediaBtn: $('addMediaBtn'),
+  mediaInput: $('mediaInput'),
+  mediaSection: $('mediaSection'),
+  mediaList: $('mediaList'),
+  mediaScale: $('mediaScale'),
+  mediaScaleVal: $('mediaScaleVal'),
+  addTextBtn: $('addTextBtn'),
+  textList: $('textList'),
+  textEditSection: $('textEditSection'),
+  textContent: $('textContent'),
+  textSize: $('textSize'),
+  textSizeVal: $('textSizeVal'),
+  textColor: $('textColor'),
+  textColorHex: $('textColorHex'),
+  textWeight: $('textWeight'),
+  previewFrame: $('previewFrame'),
+  previewEmpty: $('previewEmpty'),
+};
+
+el.addMediaBtn.addEventListener('click', () => el.mediaInput.click());
+
+el.mediaInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (state.media) URL.revokeObjectURL(state.media.url);
+
+  const url = URL.createObjectURL(file);
+  const type = file.type.startsWith('video') ? 'video' : 'image';
+
+  state.media = {
+    type, url, name: file.name,
+    scale: 100, x: 50, y: 50,
+    naturalWidth: 0, naturalHeight: 0,
+  };
+
+  if (type === 'image') {
+    const img = new Image();
+    img.onload = () => {
+      state.media.naturalWidth = img.naturalWidth;
+      state.media.naturalHeight = img.naturalHeight;
+      renderAll();
+    };
+    img.src = url;
+  } else {
+    const v = document.createElement('video');
+    v.onloadedmetadata = () => {
+      state.media.naturalWidth = v.videoWidth;
+      state.media.naturalHeight = v.videoHeight;
+      renderAll();
+    };
+    v.src = url;
+  }
+  el.mediaInput.value = '';
+  renderAll();
+});
+
+el.mediaScale.addEventListener('input', (e) => {
+  if (!state.media) return;
+  state.media.scale = parseInt(e.target.value);
+  el.mediaScaleVal.textContent = state.media.scale + '%';
+  updateMediaTransform();
+});
+
+el.addTextBtn.addEventListener('click', () => {
+  const id = Date.now();
+  state.texts.push({
+    id, text: '텍스트',
+    x: 50, y: 50, size: 42,
+    color: '#ffffff', weight: '800',
+  });
+  state.selectedTextId = id;
+  renderAll();
+  setTimeout(() => { el.textContent.focus(); el.textContent.select(); }, 0);
+});
+
+el.textContent.addEventListener('input', (e) => {
+  const t = getSelectedText();
+  if (!t) return;
+  t.text = e.target.value;
+  const div = findTextDiv(t.id);
+  if (div) div.textContent = t.text || ' ';
+  renderTextList();
+});
+
+el.textSize.addEventListener('input', (e) => {
+  const t = getSelectedText();
+  if (!t) return;
+  t.size = parseInt(e.target.value);
+  el.textSizeVal.textContent = t.size + 'px';
+  const div = findTextDiv(t.id);
+  if (div) div.style.fontSize = t.size + 'px';
+});
+
+el.textColor.addEventListener('input', (e) => {
+  const t = getSelectedText();
+  if (!t) return;
+  t.color = e.target.value;
+  el.textColorHex.value = e.target.value;
+  const div = findTextDiv(t.id);
+  if (div) div.style.color = t.color;
+});
+
+el.textColorHex.addEventListener('input', (e) => {
+  const t = getSelectedText();
+  if (!t) return;
+  if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
+    t.color = e.target.value;
+    el.textColor.value = e.target.value;
+    const div = findTextDiv(t.id);
+    if (div) div.style.color = t.color;
+  }
+});
+
+el.textWeight.addEventListener('change', (e) => {
+  const t = getSelectedText();
+  if (!t) return;
+  t.weight = e.target.value;
+  const div = findTextDiv(t.id);
+  if (div) div.style.fontWeight = t.weight;
+});
+
+el.previewFrame.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('.text-layer')) {
+    selectText(null);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'Escape') {
+    selectText(null);
+  } else if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedTextId !== null) {
+    e.preventDefault();
+    deleteText(state.selectedTextId);
+  }
+});
+
+window.addEventListener('resize', () => {
+  updateMediaTransform();
+  updateAllTextPositions();
+});
+
+function getSelectedText() {
+  return state.texts.find(t => t.id === state.selectedTextId);
+}
+
+function findTextDiv(id) {
+  return el.previewFrame.querySelector(`.text-layer[data-text-id="${id}"]`);
+}
+
+function selectText(id) {
+  state.selectedTextId = id;
+  renderTextEditor();
+  renderTextList();
+  Array.from(el.previewFrame.querySelectorAll('.text-layer')).forEach(div => {
+    const isSelected = id !== null && String(div.dataset.textId) === String(id);
+    div.classList.toggle('selected', isSelected);
+  });
+}
+
+function deleteText(id) {
+  state.texts = state.texts.filter(t => t.id !== id);
+  if (state.selectedTextId === id) state.selectedTextId = null;
+  renderAll();
+}
+
+function deleteMedia() {
+  if (state.media) URL.revokeObjectURL(state.media.url);
+  state.media = null;
+  lastMediaSrc = null;
+  renderAll();
+}
+
+function renderEmpty() {
+  el.previewEmpty.style.display = (state.media || state.texts.length) ? 'none' : 'flex';
+}
+
+function renderMediaList() {
+  el.mediaSection.style.display = state.media ? 'block' : 'none';
+  if (state.media) {
+    el.mediaList.innerHTML = `
+      <div class="layer-item selected">
+        <span class="icon">${state.media.type === 'video' ? '🎬' : '🖼️'}</span>
+        <span class="label">${escapeHtml(state.media.name)}</span>
+        <button class="delete" onclick="deleteMedia()" title="삭제">✕</button>
+      </div>
+    `;
+    el.mediaScale.value = state.media.scale;
+    el.mediaScaleVal.textContent = state.media.scale + '%';
+  }
+}
+
+function renderTextList() {
+  el.textList.innerHTML = state.texts.map(t => `
+    <div class="layer-item ${t.id === state.selectedTextId ? 'selected' : ''}" onclick="selectText(${t.id})">
+      <span class="icon" style="font-weight:700">T</span>
+      <span class="label">${escapeHtml(t.text || '빈 텍스트')}</span>
+      <button class="delete" onclick="event.stopPropagation(); deleteText(${t.id})" title="삭제">✕</button>
+    </div>
+  `).join('');
+}
+
+function renderTextEditor() {
+  const t = getSelectedText();
+  if (t) {
+    el.textEditSection.style.display = 'block';
+    if (document.activeElement !== el.textContent) el.textContent.value = t.text;
+    el.textSize.value = t.size;
+    el.textSizeVal.textContent = t.size + 'px';
+    el.textColor.value = t.color;
+    el.textColorHex.value = t.color;
+    el.textWeight.value = t.weight;
+  } else {
+    el.textEditSection.style.display = 'none';
+  }
+}
+
+function renderMedia() {
+  const existing = el.previewFrame.querySelector('.media-layer');
+  if (!state.media) {
+    if (existing) existing.remove();
+    lastMediaSrc = null;
+    return;
+  }
+  if (lastMediaSrc !== state.media.url) {
+    if (existing) existing.remove();
+    const wrapper = document.createElement('div');
+    wrapper.className = 'media-layer';
+    if (state.media.type === 'image') {
+      const img = document.createElement('img');
+      img.src = state.media.url;
+      img.draggable = false;
+      wrapper.appendChild(img);
+    } else {
+      const video = document.createElement('video');
+      video.src = state.media.url;
+      video.autoplay = true;
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
+      wrapper.appendChild(video);
+    }
+    el.previewFrame.insertBefore(wrapper, el.previewFrame.firstChild);
+    setupDrag(wrapper, 'media', null);
+    lastMediaSrc = state.media.url;
+  }
+  updateMediaTransform();
+}
+
+function updateMediaTransform() {
+  const wrapper = el.previewFrame.querySelector('.media-layer');
+  if (!wrapper || !state.media) return;
+  const frame = el.previewFrame.getBoundingClientRect();
+  const m = state.media;
+  let baseW, baseH;
+  if (m.naturalWidth && m.naturalHeight) {
+    const frameRatio = frame.width / frame.height;
+    const mediaRatio = m.naturalWidth / m.naturalHeight;
+    if (mediaRatio > frameRatio) {
+      baseH = frame.height;
+      baseW = baseH * mediaRatio;
+    } else {
+      baseW = frame.width;
+      baseH = baseW / mediaRatio;
+    }
+  } else {
+    baseW = frame.width;
+    baseH = frame.height;
+  }
+  const scale = m.scale / 100;
+  const w = baseW * scale;
+  const h = baseH * scale;
+  wrapper.style.width = w + 'px';
+  wrapper.style.height = h + 'px';
+  wrapper.style.left = (m.x / 100 * frame.width - w / 2) + 'px';
+  wrapper.style.top = (m.y / 100 * frame.height - h / 2) + 'px';
+}
+
+function renderTexts() {
+  Array.from(el.previewFrame.querySelectorAll('.text-layer')).forEach(n => n.remove());
+  const frame = el.previewFrame.getBoundingClientRect();
+  state.texts.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'text-layer' + (t.id === state.selectedTextId ? ' selected' : '');
+    div.dataset.textId = t.id;
+    div.textContent = t.text || ' ';
+    div.style.fontSize = t.size + 'px';
+    div.style.color = t.color;
+    div.style.fontWeight = t.weight;
+    div.style.left = (t.x / 100 * frame.width) + 'px';
+    div.style.top = (t.y / 100 * frame.height) + 'px';
+    div.style.transform = 'translate(-50%, -50%)';
+    el.previewFrame.appendChild(div);
+    setupDrag(div, 'text', t.id);
+  });
+}
+
+function updateAllTextPositions() {
+  const frame = el.previewFrame.getBoundingClientRect();
+  state.texts.forEach(t => {
+    const div = findTextDiv(t.id);
+    if (div) {
+      div.style.left = (t.x / 100 * frame.width) + 'px';
+      div.style.top = (t.y / 100 * frame.height) + 'px';
+    }
+  });
+}
+
+function renderAll() {
+  renderEmpty();
+  renderMediaList();
+  renderTextList();
+  renderTextEditor();
+  renderMedia();
+  renderTexts();
+}
+
+function setupDrag(elem, type, id) {
+  elem.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (type === 'text') {
+      e.stopPropagation();
+      selectText(id);
+    }
+    const frame = el.previewFrame.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const obj = type === 'media' ? state.media : state.texts.find(t => t.id === id);
+    if (!obj) return;
+    const origX = obj.x;
+    const origY = obj.y;
+
+    function onMove(ev) {
+      const dx = (ev.clientX - startX) / frame.width * 100;
+      const dy = (ev.clientY - startY) / frame.height * 100;
+      obj.x = origX + dx;
+      obj.y = origY + dy;
+      if (type === 'media') {
+        updateMediaTransform();
+      } else {
+        elem.style.left = (obj.x / 100 * frame.width) + 'px';
+        elem.style.top = (obj.y / 100 * frame.height) + 'px';
+      }
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+window.deleteText = deleteText;
+window.deleteMedia = deleteMedia;
+window.selectText = selectText;
+
+requestAnimationFrame(renderAll);
+</script>
+</body>
+</html>
