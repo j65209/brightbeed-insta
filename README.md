@@ -13,4 +13,7 @@
 
 ## 배포
 
-Netlify에 연결되어 있음 (`netlify.toml` 참고). publish 디렉터리는 루트.
+GitHub Pages — main 브랜치 루트에서 자동 배포.
+URL: https://j65209.github.io/brightbeed-insta/
+
+`git push` 하면 1~2분 뒤에 자동 반영됨. Jekyll은 `.nojekyll`로 비활성화.
