@@ -283,6 +283,14 @@ input[type="color"] {
     0 0 0.6em var(--fx-color, #ff00ff),
     0 0 1em var(--fx-color, #ff00ff);
 }
+.text-content.fx-pen {
+  padding-bottom: 0.4em;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  background-size: 100% 0.4em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
 .effect-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
 }
@@ -437,6 +445,7 @@ input[type="color"] {
           <button class="effect-btn" data-effect="block">블록</button>
           <button class="effect-btn" data-effect="stroke">외곽선</button>
           <button class="effect-btn" data-effect="neon">네온</button>
+          <button class="effect-btn" data-effect="pen">펜 밑줄</button>
         </div>
       </div>
       <div class="control" id="fxColorControl" style="display:none">
@@ -887,17 +896,28 @@ function defaultFxColor(effect) {
     case 'block': return '#000000';
     case 'stroke': return '#000000';
     case 'neon': return '#ff00ff';
+    case 'pen': return '#e53e3e';
     default: return '#ffeb3b';
   }
+}
+
+function makePenUnderlineSVG(color) {
+  const c = encodeURIComponent(color);
+  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 24' preserveAspectRatio='none'%3E%3Cpath d='M5,15 Q40,6 80,13 T140,11 Q170,8 195,14' stroke='${c}' stroke-width='3.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E")`;
 }
 
 function refreshTextEffect(t) {
   const span = findTextSpan(t.id);
   if (!span) return;
-  span.classList.remove('fx-highlight', 'fx-block', 'fx-stroke', 'fx-neon');
+  span.classList.remove('fx-highlight', 'fx-block', 'fx-stroke', 'fx-neon', 'fx-pen');
+  span.style.backgroundImage = '';
   if (t.effect && t.effect !== 'none') {
     span.classList.add('fx-' + t.effect);
-    span.style.setProperty('--fx-color', t.fxColor || defaultFxColor(t.effect));
+    const fx = t.fxColor || defaultFxColor(t.effect);
+    span.style.setProperty('--fx-color', fx);
+    if (t.effect === 'pen') {
+      span.style.backgroundImage = makePenUnderlineSVG(fx);
+    }
   } else {
     span.style.removeProperty('--fx-color');
   }
@@ -1232,7 +1252,11 @@ function renderTexts() {
     span.className = 'text-content';
     if (t.effect && t.effect !== 'none') {
       span.classList.add('fx-' + t.effect);
-      span.style.setProperty('--fx-color', t.fxColor || '#ffeb3b');
+      const fx = t.fxColor || defaultFxColor(t.effect);
+      span.style.setProperty('--fx-color', fx);
+      if (t.effect === 'pen') {
+        span.style.backgroundImage = makePenUnderlineSVG(fx);
+      }
     }
     span.textContent = t.text || ' ';
     span.style.fontSize = t.size + 'px';
@@ -1491,8 +1515,36 @@ function drawSingleText(ctx, t, scaleFactor) {
       ctx.fillText(line, x, lineY);
     }
     ctx.fillText(line, x, lineY);
+    if (effect === 'pen') {
+      const lineWidth = ctx.measureText(line).width;
+      drawPenUnderline(ctx, x, lineY, lineWidth, fontSize, t.fxColor || defaultFxColor('pen'));
+    }
   });
 
+  ctx.restore();
+}
+
+function drawPenUnderline(ctx, cx, lineY, lineWidth, fontSize, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = fontSize * 0.09;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  const padX = fontSize * 0.12;
+  const startX = cx - lineWidth / 2 - padX;
+  const endX = cx + lineWidth / 2 + padX;
+  const w = endX - startX;
+  const baseY = lineY + fontSize * 0.5;
+  const amp = fontSize * 0.06;
+  ctx.beginPath();
+  ctx.moveTo(startX, baseY + amp * 0.3);
+  ctx.quadraticCurveTo(startX + w * 0.2, baseY - amp * 1.4, startX + w * 0.4, baseY - amp * 0.2);
+  ctx.quadraticCurveTo(startX + w * 0.6, baseY + amp * 1.0, startX + w * 0.8, baseY - amp * 0.4);
+  ctx.quadraticCurveTo(startX + w * 0.92, baseY - amp * 0.8, endX, baseY + amp * 0.2);
+  ctx.stroke();
   ctx.restore();
 }
 
