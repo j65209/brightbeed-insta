@@ -228,10 +228,15 @@ input[type="color"] {
 }
 .text-layer {
   position: absolute; cursor: move; user-select: none;
+  display: flex; align-items: center; justify-content: center;
+  padding: 4px; max-width: 90%;
+  box-sizing: border-box;
+}
+.text-content {
   white-space: pre-wrap; text-align: center;
   text-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  padding: 4px; line-height: 1.2;
-  word-break: keep-all; max-width: 90%;
+  line-height: 1.2; word-break: keep-all;
+  width: 100%;
 }
 .text-layer.selected {
   outline: 1.5px dashed rgba(255,255,255,0.9);
@@ -248,6 +253,10 @@ input[type="color"] {
 .text-handle.tr { top: -6px; right: -6px; cursor: nesw-resize; }
 .text-handle.bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
 .text-handle.br { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.text-handle.t { top: -6px; left: 50%; margin-left: -5.5px; cursor: ns-resize; }
+.text-handle.b { bottom: -6px; left: 50%; margin-left: -5.5px; cursor: ns-resize; }
+.text-handle.l { top: 50%; left: -6px; margin-top: -5.5px; cursor: ew-resize; }
+.text-handle.r { top: 50%; right: -6px; margin-top: -5.5px; cursor: ew-resize; }
 .text-handle:hover { background: var(--text); border-color: white; }
 .export-btn {
   position: absolute; top: 16px; right: 16px;
@@ -751,12 +760,17 @@ el.phraseList.addEventListener('click', (e) => {
   addTextLayer(phrase);
 });
 
+function findTextSpan(id) {
+  const div = findTextDiv(id);
+  return div ? div.querySelector('.text-content') : null;
+}
+
 el.textContent.addEventListener('input', (e) => {
   const t = getSelectedText();
   if (!t) return;
   t.text = e.target.value;
-  const div = findTextDiv(t.id);
-  if (div) div.textContent = t.text || ' ';
+  const span = findTextSpan(t.id);
+  if (span) span.textContent = t.text || ' ';
   renderTextList();
 });
 
@@ -765,8 +779,8 @@ el.textSize.addEventListener('input', (e) => {
   if (!t) return;
   t.size = parseInt(e.target.value);
   el.textSizeVal.textContent = t.size + 'px';
-  const div = findTextDiv(t.id);
-  if (div) div.style.fontSize = t.size + 'px';
+  const span = findTextSpan(t.id);
+  if (span) span.style.fontSize = t.size + 'px';
 });
 
 el.textColor.addEventListener('input', (e) => {
@@ -774,8 +788,8 @@ el.textColor.addEventListener('input', (e) => {
   if (!t) return;
   t.color = e.target.value;
   el.textColorHex.value = e.target.value;
-  const div = findTextDiv(t.id);
-  if (div) div.style.color = t.color;
+  const span = findTextSpan(t.id);
+  if (span) span.style.color = t.color;
 });
 
 el.textColorHex.addEventListener('input', (e) => {
@@ -784,8 +798,8 @@ el.textColorHex.addEventListener('input', (e) => {
   if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
     t.color = e.target.value;
     el.textColor.value = e.target.value;
-    const div = findTextDiv(t.id);
-    if (div) div.style.color = t.color;
+    const span = findTextSpan(t.id);
+    if (span) span.style.color = t.color;
   }
 });
 
@@ -793,8 +807,8 @@ el.textWeight.addEventListener('change', (e) => {
   const t = getSelectedText();
   if (!t) return;
   t.weight = e.target.value;
-  const div = findTextDiv(t.id);
-  if (div) div.style.fontWeight = t.weight;
+  const span = findTextSpan(t.id);
+  if (span) span.style.fontWeight = t.weight;
 });
 
 el.previewFrame.addEventListener('mousedown', (e) => {
@@ -847,7 +861,15 @@ function addHandles(div, t) {
   ['tl', 'tr', 'bl', 'br'].forEach(corner => {
     const handle = document.createElement('div');
     handle.className = `text-handle ${corner}`;
+    handle.title = '폰트 크기 조절';
     handle.addEventListener('mousedown', (e) => startResize(e, t, div, corner));
+    div.appendChild(handle);
+  });
+  ['t', 'b', 'l', 'r'].forEach(edge => {
+    const handle = document.createElement('div');
+    handle.className = `text-handle ${edge}`;
+    handle.title = '박스 크기 조절 (폰트 유지)';
+    handle.addEventListener('mousedown', (e) => startBoxResize(e, t, div, edge));
     div.appendChild(handle);
   });
 }
@@ -860,6 +882,7 @@ function startResize(e, t, div, corner) {
   const centerY = rect.top + rect.height / 2;
   const initialDistance = Math.max(1, Math.hypot(e.clientX - centerX, e.clientY - centerY));
   const initialSize = t.size;
+  const span = div.querySelector('.text-content');
   const cursor = (corner === 'tl' || corner === 'br') ? 'nwse-resize' : 'nesw-resize';
   document.body.style.cursor = cursor;
   function onMove(ev) {
@@ -867,11 +890,61 @@ function startResize(e, t, div, corner) {
     const scale = newDistance / initialDistance;
     const newSize = Math.max(8, Math.min(300, Math.round(initialSize * scale)));
     t.size = newSize;
-    div.style.fontSize = newSize + 'px';
+    if (span) span.style.fontSize = newSize + 'px';
     if (state.selectedTextId === t.id) {
       el.textSize.value = newSize;
       el.textSizeVal.textContent = newSize + 'px';
     }
+  }
+  function onUp() {
+    document.body.style.cursor = '';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+function startBoxResize(e, t, div, edge) {
+  e.preventDefault();
+  e.stopPropagation();
+  const frame = el.previewFrame.getBoundingClientRect();
+  const rect = div.getBoundingClientRect();
+  const initial = {
+    left: rect.left - frame.left,
+    top: rect.top - frame.top,
+    width: rect.width,
+    height: rect.height,
+  };
+  const startX = e.clientX, startY = e.clientY;
+  document.body.style.cursor = (edge === 'l' || edge === 'r') ? 'ew-resize' : 'ns-resize';
+  function onMove(ev) {
+    const dx = ev.clientX - startX;
+    const dy = ev.clientY - startY;
+    let newLeft = initial.left, newTop = initial.top;
+    let newWidth = initial.width, newHeight = initial.height;
+    if (edge === 'r') {
+      newWidth = Math.max(24, initial.width + dx);
+    } else if (edge === 'l') {
+      newWidth = Math.max(24, initial.width - dx);
+      newLeft = initial.left + (initial.width - newWidth);
+    } else if (edge === 'b') {
+      newHeight = Math.max(24, initial.height + dy);
+    } else if (edge === 't') {
+      newHeight = Math.max(24, initial.height - dy);
+      newTop = initial.top + (initial.height - newHeight);
+    }
+    const newCenterX = newLeft + newWidth / 2;
+    const newCenterY = newTop + newHeight / 2;
+    t.x = newCenterX / frame.width * 100;
+    t.y = newCenterY / frame.height * 100;
+    t.width = newWidth;
+    t.height = newHeight;
+    div.style.width = newWidth + 'px';
+    div.style.maxWidth = 'none';
+    div.style.height = newHeight + 'px';
+    div.style.left = (t.x / 100 * frame.width) + 'px';
+    div.style.top = (t.y / 100 * frame.height) + 'px';
   }
   function onUp() {
     document.body.style.cursor = '';
@@ -1007,13 +1080,18 @@ function renderTexts() {
     const div = document.createElement('div');
     div.className = 'text-layer' + (t.id === state.selectedTextId ? ' selected' : '');
     div.dataset.textId = t.id;
-    div.textContent = t.text || ' ';
-    div.style.fontSize = t.size + 'px';
-    div.style.color = t.color;
-    div.style.fontWeight = t.weight;
+    const span = document.createElement('span');
+    span.className = 'text-content';
+    span.textContent = t.text || ' ';
+    span.style.fontSize = t.size + 'px';
+    span.style.color = t.color;
+    span.style.fontWeight = t.weight;
+    div.appendChild(span);
     div.style.left = (t.x / 100 * frame.width) + 'px';
     div.style.top = (t.y / 100 * frame.height) + 'px';
     div.style.transform = 'translate(-50%, -50%)';
+    if (t.width != null) { div.style.width = t.width + 'px'; div.style.maxWidth = 'none'; }
+    if (t.height != null) div.style.height = t.height + 'px';
     el.previewFrame.appendChild(div);
     setupDrag(div, 'text', t.id);
     if (t.id === state.selectedTextId) addHandles(div, t);
@@ -1148,6 +1226,43 @@ async function drawMediaToCanvas(ctx) {
   }
 }
 
+function wrapTextToWidth(ctx, text, maxWidth) {
+  const result = [];
+  for (const para of text.split('\n')) {
+    if (!maxWidth || ctx.measureText(para).width <= maxWidth) {
+      result.push(para);
+      continue;
+    }
+    const parts = para.split(' ');
+    let currentLine = '';
+    for (const part of parts) {
+      const test = currentLine ? currentLine + ' ' + part : part;
+      if (ctx.measureText(test).width <= maxWidth) {
+        currentLine = test;
+        continue;
+      }
+      if (currentLine) result.push(currentLine);
+      if (ctx.measureText(part).width > maxWidth) {
+        let tmp = '';
+        for (const ch of part) {
+          const tmpTest = tmp + ch;
+          if (ctx.measureText(tmpTest).width > maxWidth && tmp) {
+            result.push(tmp);
+            tmp = ch;
+          } else {
+            tmp = tmpTest;
+          }
+        }
+        currentLine = tmp;
+      } else {
+        currentLine = part;
+      }
+    }
+    if (currentLine) result.push(currentLine);
+  }
+  return result;
+}
+
 function drawTextsToCanvas(ctx) {
   const previewRect = el.previewFrame.getBoundingClientRect();
   const scaleFactor = OUT_H / previewRect.height;
@@ -1162,7 +1277,8 @@ function drawTextsToCanvas(ctx) {
     ctx.shadowOffsetY = 2 * scaleFactor;
     const x = t.x / 100 * OUT_W;
     const y = t.y / 100 * OUT_H;
-    const lines = (t.text || ' ').split('\n');
+    const maxWidth = t.width != null ? (t.width - 8) * scaleFactor : null;
+    const lines = wrapTextToWidth(ctx, t.text || ' ', maxWidth);
     const lineHeight = fontSize * 1.2;
     const totalHeight = lines.length * lineHeight;
     lines.forEach((line, i) => {
