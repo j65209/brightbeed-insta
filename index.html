@@ -479,7 +479,7 @@ input[type="color"] {
         <span class="icon">↓</span>
         <span id="exportBtnText">고화질 저장</span>
       </button>
-      <div class="size-info">1080×1920</div>
+      <div class="size-info" id="sizeInfo">1080×1920</div>
     </div>
   </main>
 </div>
@@ -719,7 +719,13 @@ const el = {
   exportBtnText: $('exportBtnText'),
   recordingIndicator: $('recordingIndicator'),
   recordingText: $('recordingText'),
+  sizeInfo: $('sizeInfo'),
 };
+
+function updateSizeInfo() {
+  const dims = computeOutputDimensions();
+  el.sizeInfo.textContent = `${dims.w}×${dims.h}`;
+}
 
 el.addMediaBtn.addEventListener('click', () => el.mediaInput.click());
 
@@ -1292,6 +1298,7 @@ function renderAll() {
   renderTextEditor();
   renderMedia();
   renderTexts();
+  updateSizeInfo();
 }
 
 function setupDrag(elem, type, id) {
@@ -1335,13 +1342,41 @@ function escapeHtml(s) {
 }
 
 // ── Export (high-quality save) ──────────────────────────
-const OUT_W = 1080, OUT_H = 1920;
+let OUT_W = 1080, OUT_H = 1920;
+const MAX_OUT_W = 1080, MAX_OUT_H = 1920;
+
+function computeOutputDimensions() {
+  const m = state.media;
+  if (!m || !m.naturalWidth || !m.naturalHeight) {
+    return { w: MAX_OUT_W, h: MAX_OUT_H };
+  }
+  const frameRatio = 9 / 16;
+  const mediaRatio = m.naturalWidth / m.naturalHeight;
+  let h, w;
+  if (mediaRatio >= frameRatio) {
+    h = m.naturalHeight;
+    w = Math.round(h * 9 / 16);
+  } else {
+    w = m.naturalWidth;
+    h = Math.round(w * 16 / 9);
+  }
+  if (h > MAX_OUT_H) {
+    h = MAX_OUT_H;
+    w = Math.round(h * 9 / 16);
+  }
+  if (w % 2) w += 1;
+  if (h % 2) h += 1;
+  return { w, h };
+}
 
 async function exportMedia() {
   if (!state.media && !state.texts.length) {
     alert('이미지/영상이나 텍스트를 먼저 추가해주세요.');
     return;
   }
+  const dims = computeOutputDimensions();
+  OUT_W = dims.w;
+  OUT_H = dims.h;
   el.exportBtn.disabled = true;
   const originalText = el.exportBtnText.textContent;
   try {
@@ -1363,16 +1398,26 @@ async function exportMedia() {
 }
 
 async function exportAsImage() {
+  const tick = (pct) => {
+    el.exportBtnText.textContent = `저장 중 ${pct}%`;
+    return new Promise(r => requestAnimationFrame(r));
+  };
+  await tick(5);
   const canvas = document.createElement('canvas');
   canvas.width = OUT_W;
   canvas.height = OUT_H;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, OUT_W, OUT_H);
+  await tick(20);
   if (state.media) await drawMediaToCanvas(ctx);
+  await tick(50);
   drawTextsToCanvas(ctx);
+  await tick(70);
   const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.95));
+  await tick(95);
   downloadBlob(blob, `brightbeed-${timestamp()}.jpg`);
+  await tick(100);
 }
 
 async function drawMediaToCanvas(ctx) {
@@ -1593,6 +1638,7 @@ async function exportAsVideo() {
   const startedAt = performance.now();
   el.recordingIndicator.classList.add('active');
   el.recordingText.textContent = '녹화 중 0%';
+  el.exportBtnText.textContent = '저장 중 0%';
 
   recorder.start();
   await video.play();
@@ -1606,6 +1652,7 @@ async function exportAsVideo() {
     drawTextsToCanvas(ctx);
     const progress = Math.min(100, Math.round((video.currentTime / duration) * 100));
     el.recordingText.textContent = `녹화 중 ${progress}%`;
+    el.exportBtnText.textContent = `저장 중 ${progress}%`;
     if (video.ended || video.currentTime >= duration - 0.05) {
       stopped = true;
       setTimeout(() => recorder.stop(), 100);
