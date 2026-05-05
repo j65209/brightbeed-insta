@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>brightbeed-insta</title>
+<title>릴스 메이커</title>
 <style>
 :root {
   --bg: #f7f7f8;
@@ -258,6 +258,44 @@ input[type="color"] {
 .text-handle.l { top: 50%; left: -6px; margin-top: -5.5px; cursor: ew-resize; }
 .text-handle.r { top: 50%; right: -6px; margin-top: -5.5px; cursor: ew-resize; }
 .text-handle:hover { background: var(--text); border-color: white; }
+.text-content.fx-highlight {
+  background: linear-gradient(transparent 62%, var(--fx-color, #ffeb3b) 62%, var(--fx-color, #ffeb3b) 95%, transparent 95%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: 0 0.15em;
+}
+.text-content.fx-block {
+  background: var(--fx-color, #000);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: 0.05em 0.4em;
+  text-shadow: none;
+}
+.text-content.fx-stroke {
+  -webkit-text-stroke: 0.06em var(--fx-color, #000);
+  paint-order: stroke fill;
+  text-shadow: none;
+}
+.text-content.fx-neon {
+  text-shadow:
+    0 0 0.15em var(--fx-color, #ff00ff),
+    0 0 0.3em var(--fx-color, #ff00ff),
+    0 0 0.6em var(--fx-color, #ff00ff),
+    0 0 1em var(--fx-color, #ff00ff);
+}
+.effect-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+}
+.effect-btn {
+  padding: 8px 4px;
+  background: white; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 11px;
+  font-family: inherit; cursor: pointer;
+  color: var(--text); transition: all 0.15s;
+  font-weight: 500;
+}
+.effect-btn:hover { border-color: var(--text); }
+.effect-btn.active { background: var(--text); color: white; border-color: var(--text); }
 .export-btn {
   position: absolute; top: 16px; right: 16px;
   background: white; color: var(--text);
@@ -390,6 +428,30 @@ input[type="color"] {
           <option value="600">진하게</option>
           <option value="800" selected>매우 진하게</option>
         </select>
+      </div>
+      <div class="control">
+        <label class="control-label">효과</label>
+        <div class="effect-grid">
+          <button class="effect-btn active" data-effect="none">기본</button>
+          <button class="effect-btn" data-effect="highlight">형광펜</button>
+          <button class="effect-btn" data-effect="block">블록</button>
+          <button class="effect-btn" data-effect="stroke">외곽선</button>
+          <button class="effect-btn" data-effect="neon">네온</button>
+        </div>
+      </div>
+      <div class="control" id="fxColorControl" style="display:none">
+        <label class="control-label">효과 색상</label>
+        <div class="row">
+          <input type="color" id="fxColor" value="#ffeb3b">
+          <input type="text" class="input" id="fxColorHex" value="#ffeb3b" style="flex:1">
+        </div>
+      </div>
+      <div class="control">
+        <label class="control-label">기울기</label>
+        <div class="row">
+          <input type="range" id="textRotation" min="-30" max="30" value="0">
+          <span class="range-value" id="textRotationVal">0°</span>
+        </div>
       </div>
     </div>
   </aside>
@@ -634,6 +696,11 @@ const el = {
   textColor: $('textColor'),
   textColorHex: $('textColorHex'),
   textWeight: $('textWeight'),
+  fxColor: $('fxColor'),
+  fxColorHex: $('fxColorHex'),
+  fxColorControl: $('fxColorControl'),
+  textRotation: $('textRotation'),
+  textRotationVal: $('textRotationVal'),
   categoryTabs: $('categoryTabs'),
   lineTabs: $('lineTabs'),
   phraseList: $('phraseList'),
@@ -692,6 +759,9 @@ function addTextLayer(initialText) {
     id, text: initialText || '텍스트',
     x: 50, y: 50, size: 42,
     color: '#ffffff', weight: '800',
+    effect: 'none',
+    fxColor: '#ffeb3b',
+    rotation: 0,
   });
   state.selectedTextId = id;
   renderAll();
@@ -809,6 +879,74 @@ el.textWeight.addEventListener('change', (e) => {
   t.weight = e.target.value;
   const span = findTextSpan(t.id);
   if (span) span.style.fontWeight = t.weight;
+});
+
+function defaultFxColor(effect) {
+  switch (effect) {
+    case 'highlight': return '#ffeb3b';
+    case 'block': return '#000000';
+    case 'stroke': return '#000000';
+    case 'neon': return '#ff00ff';
+    default: return '#ffeb3b';
+  }
+}
+
+function refreshTextEffect(t) {
+  const span = findTextSpan(t.id);
+  if (!span) return;
+  span.classList.remove('fx-highlight', 'fx-block', 'fx-stroke', 'fx-neon');
+  if (t.effect && t.effect !== 'none') {
+    span.classList.add('fx-' + t.effect);
+    span.style.setProperty('--fx-color', t.fxColor || defaultFxColor(t.effect));
+  } else {
+    span.style.removeProperty('--fx-color');
+  }
+}
+
+document.querySelectorAll('.effect-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const t = getSelectedText();
+    if (!t) return;
+    const newEffect = btn.dataset.effect;
+    t.effect = newEffect;
+    if (newEffect !== 'none') {
+      t.fxColor = t.fxColor || defaultFxColor(newEffect);
+      el.fxColor.value = t.fxColor;
+      el.fxColorHex.value = t.fxColor;
+    }
+    document.querySelectorAll('.effect-btn').forEach(b => {
+      b.classList.toggle('active', b === btn);
+    });
+    el.fxColorControl.style.display = newEffect === 'none' ? 'none' : 'block';
+    refreshTextEffect(t);
+  });
+});
+
+el.fxColor.addEventListener('input', (e) => {
+  const t = getSelectedText();
+  if (!t) return;
+  t.fxColor = e.target.value;
+  el.fxColorHex.value = e.target.value;
+  refreshTextEffect(t);
+});
+
+el.fxColorHex.addEventListener('input', (e) => {
+  const t = getSelectedText();
+  if (!t) return;
+  if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
+    t.fxColor = e.target.value;
+    el.fxColor.value = e.target.value;
+    refreshTextEffect(t);
+  }
+});
+
+el.textRotation.addEventListener('input', (e) => {
+  const t = getSelectedText();
+  if (!t) return;
+  t.rotation = parseInt(e.target.value);
+  el.textRotationVal.textContent = t.rotation + '°';
+  const div = findTextDiv(t.id);
+  if (div) div.style.transform = `translate(-50%, -50%) rotate(${t.rotation}deg)`;
 });
 
 el.previewFrame.addEventListener('mousedown', (e) => {
@@ -1007,6 +1145,16 @@ function renderTextEditor() {
     el.textColor.value = t.color;
     el.textColorHex.value = t.color;
     el.textWeight.value = t.weight;
+    const effect = t.effect || 'none';
+    document.querySelectorAll('.effect-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.effect === effect);
+    });
+    el.fxColorControl.style.display = effect === 'none' ? 'none' : 'block';
+    const fx = t.fxColor || defaultFxColor(effect);
+    el.fxColor.value = fx;
+    el.fxColorHex.value = fx;
+    el.textRotation.value = t.rotation || 0;
+    el.textRotationVal.textContent = (t.rotation || 0) + '°';
   } else {
     el.textEditSection.style.display = 'none';
   }
@@ -1082,6 +1230,10 @@ function renderTexts() {
     div.dataset.textId = t.id;
     const span = document.createElement('span');
     span.className = 'text-content';
+    if (t.effect && t.effect !== 'none') {
+      span.classList.add('fx-' + t.effect);
+      span.style.setProperty('--fx-color', t.fxColor || '#ffeb3b');
+    }
     span.textContent = t.text || ' ';
     span.style.fontSize = t.size + 'px';
     span.style.color = t.color;
@@ -1089,7 +1241,7 @@ function renderTexts() {
     div.appendChild(span);
     div.style.left = (t.x / 100 * frame.width) + 'px';
     div.style.top = (t.y / 100 * frame.height) + 'px';
-    div.style.transform = 'translate(-50%, -50%)';
+    div.style.transform = `translate(-50%, -50%) rotate(${t.rotation || 0}deg)`;
     if (t.width != null) { div.style.width = t.width + 'px'; div.style.maxWidth = 'none'; }
     if (t.height != null) div.style.height = t.height + 'px';
     el.previewFrame.appendChild(div);
@@ -1266,29 +1418,82 @@ function wrapTextToWidth(ctx, text, maxWidth) {
 function drawTextsToCanvas(ctx) {
   const previewRect = el.previewFrame.getBoundingClientRect();
   const scaleFactor = OUT_H / previewRect.height;
-  state.texts.forEach(t => {
-    const fontSize = t.size * scaleFactor;
-    ctx.font = `${t.weight} ${fontSize}px -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif`;
-    ctx.fillStyle = t.color;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.4)';
-    ctx.shadowBlur = 8 * scaleFactor;
-    ctx.shadowOffsetY = 2 * scaleFactor;
-    const x = t.x / 100 * OUT_W;
-    const y = t.y / 100 * OUT_H;
-    const maxWidth = t.width != null ? (t.width - 8) * scaleFactor : null;
-    const lines = wrapTextToWidth(ctx, t.text || ' ', maxWidth);
-    const lineHeight = fontSize * 1.2;
-    const totalHeight = lines.length * lineHeight;
+  state.texts.forEach(t => drawSingleText(ctx, t, scaleFactor));
+}
+
+function drawSingleText(ctx, t, scaleFactor) {
+  const fontSize = t.size * scaleFactor;
+  const x = t.x / 100 * OUT_W;
+  const y = t.y / 100 * OUT_H;
+  const effect = t.effect || 'none';
+
+  ctx.save();
+  if (t.rotation) {
+    ctx.translate(x, y);
+    ctx.rotate(t.rotation * Math.PI / 180);
+    ctx.translate(-x, -y);
+  }
+
+  ctx.font = `${t.weight} ${fontSize}px -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const maxWidth = t.width != null ? (t.width - 8) * scaleFactor : null;
+  const lines = wrapTextToWidth(ctx, t.text || ' ', maxWidth);
+  const lineHeight = fontSize * 1.2;
+  const totalHeight = lines.length * lineHeight;
+
+  if (effect === 'highlight' || effect === 'block') {
     lines.forEach((line, i) => {
-      const yOffset = y - totalHeight / 2 + lineHeight / 2 + i * lineHeight;
-      ctx.fillText(line, x, yOffset);
+      const lineY = y - totalHeight / 2 + lineHeight / 2 + i * lineHeight;
+      const lineWidth = ctx.measureText(line).width;
+      const padX = fontSize * (effect === 'block' ? 0.4 : 0.15);
+      const bgWidth = lineWidth + padX * 2;
+      ctx.fillStyle = t.fxColor || defaultFxColor(effect);
+      if (effect === 'highlight') {
+        const barHeight = lineHeight * 0.36;
+        const barY = lineY + lineHeight * 0.18 - barHeight / 2;
+        ctx.fillRect(x - bgWidth / 2, barY, bgWidth, barHeight);
+      } else {
+        const padY = fontSize * 0.05;
+        ctx.fillRect(x - bgWidth / 2, lineY - lineHeight / 2 + padY, bgWidth, lineHeight - padY * 2);
+      }
     });
+  }
+
+  if (effect === 'neon') {
+    ctx.shadowColor = t.fxColor || defaultFxColor('neon');
+    ctx.shadowBlur = fontSize * 0.6;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  } else if (effect === 'block' || effect === 'stroke') {
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
+  } else {
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 8 * scaleFactor;
+    ctx.shadowOffsetY = 2 * scaleFactor;
+  }
+
+  lines.forEach((line, i) => {
+    const lineY = y - totalHeight / 2 + lineHeight / 2 + i * lineHeight;
+    if (effect === 'stroke') {
+      ctx.strokeStyle = t.fxColor || defaultFxColor('stroke');
+      ctx.lineWidth = fontSize * 0.12;
+      ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
+      ctx.strokeText(line, x, lineY);
+    }
+    ctx.fillStyle = t.color;
+    if (effect === 'neon') {
+      ctx.fillText(line, x, lineY);
+      ctx.fillText(line, x, lineY);
+    }
+    ctx.fillText(line, x, lineY);
   });
+
+  ctx.restore();
 }
 
 async function exportAsVideo() {
