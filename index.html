@@ -234,9 +234,21 @@ input[type="color"] {
   word-break: keep-all; max-width: 90%;
 }
 .text-layer.selected {
-  outline: 2px dashed rgba(255,255,255,0.8);
-  outline-offset: 4px; border-radius: 2px;
+  outline: 1.5px dashed rgba(255,255,255,0.9);
+  outline-offset: 0;
+  border-radius: 2px;
 }
+.text-handle {
+  position: absolute; width: 11px; height: 11px;
+  background: white; border: 1.5px solid var(--text);
+  border-radius: 2px; z-index: 5;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.text-handle.tl { top: -6px; left: -6px; cursor: nwse-resize; }
+.text-handle.tr { top: -6px; right: -6px; cursor: nesw-resize; }
+.text-handle.bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.text-handle.br { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.text-handle:hover { background: var(--text); border-color: white; }
 .export-btn {
   position: absolute; top: 16px; right: 16px;
   background: white; color: var(--text);
@@ -823,7 +835,51 @@ function selectText(id) {
   Array.from(el.previewFrame.querySelectorAll('.text-layer')).forEach(div => {
     const isSelected = id !== null && String(div.dataset.textId) === String(id);
     div.classList.toggle('selected', isSelected);
+    Array.from(div.querySelectorAll('.text-handle')).forEach(h => h.remove());
+    if (isSelected) {
+      const t = state.texts.find(tt => String(tt.id) === div.dataset.textId);
+      if (t) addHandles(div, t);
+    }
   });
+}
+
+function addHandles(div, t) {
+  ['tl', 'tr', 'bl', 'br'].forEach(corner => {
+    const handle = document.createElement('div');
+    handle.className = `text-handle ${corner}`;
+    handle.addEventListener('mousedown', (e) => startResize(e, t, div, corner));
+    div.appendChild(handle);
+  });
+}
+
+function startResize(e, t, div, corner) {
+  e.preventDefault();
+  e.stopPropagation();
+  const rect = div.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const initialDistance = Math.max(1, Math.hypot(e.clientX - centerX, e.clientY - centerY));
+  const initialSize = t.size;
+  const cursor = (corner === 'tl' || corner === 'br') ? 'nwse-resize' : 'nesw-resize';
+  document.body.style.cursor = cursor;
+  function onMove(ev) {
+    const newDistance = Math.hypot(ev.clientX - centerX, ev.clientY - centerY);
+    const scale = newDistance / initialDistance;
+    const newSize = Math.max(8, Math.min(300, Math.round(initialSize * scale)));
+    t.size = newSize;
+    div.style.fontSize = newSize + 'px';
+    if (state.selectedTextId === t.id) {
+      el.textSize.value = newSize;
+      el.textSizeVal.textContent = newSize + 'px';
+    }
+  }
+  function onUp() {
+    document.body.style.cursor = '';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
 }
 
 function deleteText(id) {
@@ -960,6 +1016,7 @@ function renderTexts() {
     div.style.transform = 'translate(-50%, -50%)';
     el.previewFrame.appendChild(div);
     setupDrag(div, 'text', t.id);
+    if (t.id === state.selectedTextId) addHandles(div, t);
   });
 }
 
