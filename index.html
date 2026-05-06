@@ -348,6 +348,7 @@ input[type="color"] {
   .preview-area { padding: 16px; }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/webm-muxer@5.0.3/build/webm-muxer.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -1381,10 +1382,10 @@ async function exportMedia() {
   const originalText = el.exportBtnText.textContent;
   try {
     if (state.media && state.media.type === 'video') {
-      el.exportBtnText.textContent = '준비 중...';
+      el.exportBtnText.textContent = '저장 중 0%';
       await exportAsVideo();
     } else {
-      el.exportBtnText.textContent = '저장 중...';
+      el.exportBtnText.textContent = '저장 중 0%';
       await exportAsImage();
     }
   } catch (err) {
@@ -1599,6 +1600,152 @@ async function exportAsVideo() {
     await exportAsImage();
     return;
   }
+  await new Promise(r => {
+    if (video.readyState >= 2) r();
+    else video.addEventListener('loadeddata', r, { once: true });
+  });
+
+  const canFast =
+    typeof VideoEncoder !== 'undefined' &&
+    typeof VideoFrame !== 'undefined' &&
+    typeof window.WebMMuxer !== 'undefined' &&
+    typeof video.requestVideoFrameCallback === 'function';
+
+  if (canFast) {
+    try {
+      await exportAsVideoFast(video);
+      return;
+    } catch (err) {
+      console.warn('Fast export failed, falling back:', err);
+    }
+  }
+  await exportAsVideoLegacy(video);
+}
+
+async function exportAsVideoFast(video) {
+  const config = {
+    codec: 'vp09.00.10.08',
+    width: OUT_W,
+    height: OUT_H,
+    bitrate: 6_000_000,
+    framerate: 30,
+  };
+  const support = await VideoEncoder.isConfigSupported(config);
+  if (!support.supported) throw new Error('VP9 encoder not supported');
+
+  const Muxer = window.WebMMuxer.Muxer;
+  const ArrayBufferTarget = window.WebMMuxer.ArrayBufferTarget;
+  const muxer = new Muxer({
+    target: new ArrayBufferTarget(),
+    video: { codec: 'V_VP9', width: OUT_W, height: OUT_H, frameRate: 30 },
+    firstTimestampBehavior: 'offset',
+  });
+
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (err) => { throw err; },
+  });
+  encoder.configure(config);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = OUT_W;
+  canvas.height = OUT_H;
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  const prev = {
+    rate: video.playbackRate,
+    muted: video.muted,
+    loop: video.loop,
+    time: video.currentTime,
+  };
+  video.pause();
+  video.currentTime = 0;
+  video.loop = false;
+  video.muted = true;
+  try { video.playbackRate = 16; } catch (_) {}
+
+  el.recordingIndicator.classList.add('active');
+  el.recordingText.textContent = '녹화 중 0%';
+  el.exportBtnText.textContent = '저장 중 0%';
+
+  const duration = video.duration;
+  let frameCount = 0;
+  let lastMediaTime = -1;
+
+  const done = new Promise((resolve, reject) => {
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      video.removeEventListener('ended', finish);
+      resolve();
+    };
+
+    const onFrame = (now, metadata) => {
+      if (finished) return;
+      try {
+        const mediaTime = metadata.mediaTime;
+        if (mediaTime <= lastMediaTime) {
+          if (!video.ended && mediaTime < duration - 0.05) {
+            video.requestVideoFrameCallback(onFrame);
+            return;
+          }
+        }
+        lastMediaTime = mediaTime;
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, OUT_W, OUT_H);
+        drawVideoFrame(ctx, video);
+        drawTextsToCanvas(ctx);
+
+        const ts = Math.max(0, Math.round(mediaTime * 1_000_000));
+        const frame = new VideoFrame(canvas, { timestamp: ts });
+        encoder.encode(frame, { keyFrame: frameCount % 60 === 0 });
+        frame.close();
+        frameCount++;
+
+        const progress = Math.min(99, Math.round((mediaTime / duration) * 100));
+        el.recordingText.textContent = `녹화 중 ${progress}%`;
+        el.exportBtnText.textContent = `저장 중 ${progress}%`;
+
+        if (video.ended || mediaTime >= duration - 0.05) {
+          finish();
+          return;
+        }
+        video.requestVideoFrameCallback(onFrame);
+      } catch (err) {
+        finished = true;
+        video.removeEventListener('ended', finish);
+        reject(err);
+      }
+    };
+
+    video.addEventListener('ended', finish);
+    video.requestVideoFrameCallback(onFrame);
+    video.play().catch((err) => { finished = true; reject(err); });
+  });
+
+  await done;
+  el.recordingText.textContent = '인코딩 마무리 중...';
+  el.exportBtnText.textContent = '저장 중 99%';
+  await encoder.flush();
+  encoder.close();
+  muxer.finalize();
+
+  video.pause();
+  video.playbackRate = prev.rate;
+  video.muted = prev.muted;
+  video.loop = prev.loop;
+  video.currentTime = prev.time;
+  video.play().catch(() => {});
+
+  const blob = new Blob([muxer.target.buffer], { type: 'video/webm' });
+  el.recordingText.textContent = '저장 완료';
+  el.exportBtnText.textContent = '저장 중 100%';
+  downloadBlob(blob, `brightbeed-${timestamp()}.webm`);
+}
+
+async function exportAsVideoLegacy(video) {
   if (typeof MediaRecorder === 'undefined') {
     throw new Error('이 브라우저는 영상 저장을 지원하지 않습니다');
   }
@@ -1629,13 +1776,8 @@ async function exportAsVideo() {
   video.pause();
   video.currentTime = 0;
   video.loop = false;
-  await new Promise(r => {
-    if (video.readyState >= 2) r();
-    else video.addEventListener('loadeddata', r, { once: true });
-  });
 
   const duration = video.duration;
-  const startedAt = performance.now();
   el.recordingIndicator.classList.add('active');
   el.recordingText.textContent = '녹화 중 0%';
   el.exportBtnText.textContent = '저장 중 0%';
@@ -1664,7 +1806,6 @@ async function exportAsVideo() {
 
   const blob = await recordingDone;
 
-  // Restore preview playback
   video.loop = true;
   video.currentTime = 0;
   video.play().catch(() => {});
