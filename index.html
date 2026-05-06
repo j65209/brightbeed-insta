@@ -1344,12 +1344,13 @@ function escapeHtml(s) {
 
 // ── Export (high-quality save) ──────────────────────────
 let OUT_W = 1080, OUT_H = 1920;
-const MAX_OUT_W = 1080, MAX_OUT_H = 1920;
+const FALLBACK_OUT_W = 1080, FALLBACK_OUT_H = 1920;
+const HARD_MAX_DIM = 4320;
 
 function computeOutputDimensions() {
   const m = state.media;
   if (!m || !m.naturalWidth || !m.naturalHeight) {
-    return { w: MAX_OUT_W, h: MAX_OUT_H };
+    return { w: FALLBACK_OUT_W, h: FALLBACK_OUT_H };
   }
   const frameRatio = 9 / 16;
   const mediaRatio = m.naturalWidth / m.naturalHeight;
@@ -1361,13 +1362,19 @@ function computeOutputDimensions() {
     w = m.naturalWidth;
     h = Math.round(w * 16 / 9);
   }
-  if (h > MAX_OUT_H) {
-    h = MAX_OUT_H;
+  if (h > HARD_MAX_DIM) {
+    h = HARD_MAX_DIM;
     w = Math.round(h * 9 / 16);
   }
   if (w % 2) w += 1;
   if (h % 2) h += 1;
   return { w, h };
+}
+
+function computeBitrate(w, h, fps) {
+  // VP9 quality target: ~0.12 bits per pixel per frame, floor 8 Mbps
+  const calc = Math.round(w * h * fps * 0.12);
+  return Math.max(8_000_000, calc);
 }
 
 async function exportMedia() {
@@ -1623,15 +1630,30 @@ async function exportAsVideo() {
 }
 
 async function exportAsVideoFast(video) {
-  const config = {
+  let outW = OUT_W, outH = OUT_H;
+  let config = {
     codec: 'vp09.00.10.08',
-    width: OUT_W,
-    height: OUT_H,
-    bitrate: 6_000_000,
+    width: outW,
+    height: outH,
+    bitrate: computeBitrate(outW, outH, 30),
     framerate: 30,
   };
-  const support = await VideoEncoder.isConfigSupported(config);
+  let support = await VideoEncoder.isConfigSupported(config);
+  // If encoder rejects high resolution (some HW caps at 4K or 1080p), step down
+  while (!support.supported && (outW > 1080 || outH > 1920)) {
+    const ratio = outW / outH;
+    outH = Math.max(1920, Math.round(outH * 0.75));
+    if (outH % 2) outH += 1;
+    outW = Math.round(outH * ratio);
+    if (outW % 2) outW += 1;
+    config = { ...config, width: outW, height: outH, bitrate: computeBitrate(outW, outH, 30) };
+    support = await VideoEncoder.isConfigSupported(config);
+  }
   if (!support.supported) throw new Error('VP9 encoder not supported');
+  if (outW !== OUT_W || outH !== OUT_H) {
+    console.info(`Encoder downscaled output to ${outW}x${outH}`);
+    OUT_W = outW; OUT_H = outH;
+  }
 
   const Muxer = window.WebMMuxer.Muxer;
   const ArrayBufferTarget = window.WebMMuxer.ArrayBufferTarget;
@@ -1764,7 +1786,7 @@ async function exportAsVideoLegacy(video) {
   const stream = canvas.captureStream(30);
   const recorder = new MediaRecorder(stream, {
     mimeType,
-    videoBitsPerSecond: 6_000_000,
+    videoBitsPerSecond: computeBitrate(OUT_W, OUT_H, 30),
   });
   const chunks = [];
   recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
